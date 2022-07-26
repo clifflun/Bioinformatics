@@ -31,6 +31,7 @@ echo "STAR mapping"
 cd .. raw_data/
 ls *fastq.gz | while read x; do gunzip ${x} & done
 cd ..
+## setting higher limit of parallel processes
 ulimit -n 10000
 find . | grep 1.fastq$ | while read x; do a=$(basename ${x}) ; sub=${a%%_*} ; STAR --genomeDir GRCh38.primary_assembly.index/ --runThreadN 48 --readFilesIn raw_data/${sub}_1.fastq raw_data/${sub}_2.fastq --outSAMtype BAM SortedByCoordinate --outSAMunmapped Within --outSAMattributes Standard --outFileNamePrefix ${sub} ;done
 ulimit -n 1024

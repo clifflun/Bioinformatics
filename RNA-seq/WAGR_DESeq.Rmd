@@ -3,7 +3,9 @@ title: "Bulk RNA analysis pipeline"
 output: github_document
 ---
 
-This is a demonstration of a simple RNA-seq analysis pipeline. The raw data is retrieved from GEO of NCBI. The accession number is *GSE119360*. 
+This is a demonstration of a simple RNA-seq analysis pipeline. The objective is ***NOT*** to find significant results.
+
+The raw data is retrieved from GEO of NCBI. The accession number is *GSE119360*. 
 
 In brief, SRA data was retrieved using `prefetch`. 
 
@@ -27,7 +29,7 @@ The second portion of data analysis starts with importing data from featureCount
 
 Please refer to the [GEO website](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE119360) for more sample preparation details.
 
-Please refer to this bash script for the code of data preprocessing.
+Please refer to this [bash script](RNA-seq_preproc.sh) for the code of data preprocessing.
 
 
 
