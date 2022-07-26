@@ -1,0 +1,9 @@
+Module	Section	Sample Name	Source
+FastQC	all_sections	SRR7777134_1	/home/wonge05/bfx/WAGR/QC/SRR7777134_1_fastqc.zip
+FastQC	all_sections	SRR7777134_2	/home/wonge05/bfx/WAGR/QC/SRR7777134_2_fastqc.zip
+FastQC	all_sections	SRR7777133_2	/home/wonge05/bfx/WAGR/QC/SRR7777133_2_fastqc.zip
+FastQC	all_sections	SRR7777133_1	/home/wonge05/bfx/WAGR/QC/SRR7777133_1_fastqc.zip
+FastQC	all_sections	SRR7777136_2	/home/wonge05/bfx/WAGR/QC/SRR7777136_2_fastqc.zip
+FastQC	all_sections	SRR7777136_1	/home/wonge05/bfx/WAGR/QC/SRR7777136_1_fastqc.zip
+FastQC	all_sections	SRR7777135_1	/home/wonge05/bfx/WAGR/QC/SRR7777135_1_fastqc.zip
+FastQC	all_sections	SRR7777135_2	/home/wonge05/bfx/WAGR/QC/SRR7777135_2_fastqc.zip

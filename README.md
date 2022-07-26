@@ -1,1 +1,3 @@
-# Bioinformatics projects
+# Bioinformatics 
+
+Bulk RNA-seq analysis

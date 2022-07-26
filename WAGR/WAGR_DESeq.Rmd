@@ -1,0 +1,232 @@
+---
+title: "Bulk RNA analysis pipeline"
+output: github_document
+---
+
+This is a demonstration of a simple RNA-seq analysis pipeline. The raw data is retrieved from GEO of NCBI. The accession number is *GSE119360*. 
+
+In brief, SRA data was retrieved using `prefetch`. 
+
+SRA data is transformed into FASTQ files using `fastq-dump`. 
+
+`fastqc` and `multiqc` are used for quality control.
+
+Since the samples are sequenced using *Illumina Genome analyszer II*, short (50bp) pair-end RNA sequences are generated. Judging by the QC reports, no trimming is done. 
+
+These sequences are then mapped to *GRCh38.p10_v26* using `STAR`, by first building an index with the desired reference and then mapping to such index. 
+
+Mapped fragments are counted using `featureCounts` from `subread` toolkit. 
+
+The results are then imported to `R` and analyzed using `DESeq2`. 
+
+The code of the first portion of data processing is not shown in this document.
+
+The second portion of data analysis starts with importing data from featureCounts, as shown below.
+
+
+
+Please refer to the [GEO website](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE119360) for more sample preparation details.
+
+Please refer to this bash script for the code of data preprocessing.
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(clusterProfiler)
+library(enrichplot)
+library(DOSE)
+library(ggnewscale)
+library(pathview)
+library(GEOquery)
+library(ggplot2)
+library(tximport)
+library(DESeq2)
+library(org.Hs.eg.db)
+library(ComplexHeatmap)
+library(RColorBrewer)
+library(circlize)
+library(dplyr)
+```
+
+
+
+## Getting metadata 
+
+```{r}
+gse <- getGEO(GEO = "GSE119360", GSEMatrix = T)
+meta <- pData(phenoData(gse[[1]]))
+
+```
+
+Subsetting metadata
+
+```{r}
+meta.subset = meta %>% 
+  mutate(group = gsub("\\d_", "", title)) %>% 
+  dplyr::select(group)
+
+meta.subset$group = as.factor(meta.subset$group)
+levels(meta.subset$group)
+meta.subset
+```
+
+## Importing data from *featureCounts*
+
+```{r}
+count.data = read.table("counts_extracted.out",header = T,sep = "\t", row.names = 1)
+names = paste0("SRR",seq(7777133,7777136))
+colnames(count.data) = names
+rownames(meta.subset) = names
+head(count.data)
+
+```
+
+## DESeq
+
+```{r}
+dds = DESeqDataSetFromMatrix(countData = count.data, colData = meta.subset, design = ~group)
+dds = DESeq(dds)
+```
+
+PCA plot to show that there is separation between two groups of sample. As shown, PC1 accounts for 42% of the difference between the two groups.
+```{r}
+vst=varianceStabilizingTransformation(dds, blind = F)
+plotPCA(vst, intgroup = "group")
+```
+
+
+Dispersion plot for QC. The red fitted line is decreasing as counts increases. This is what we want to see.
+```{r}
+plotDispEsts(dds)
+```
+
+Extracting results and filtering out insignificant p-values.
+
+The summary table shows us how many genes are up or down regulated.
+
+```{r}
+res = results(dds, contrast = c("group", "WAGR", "Control"))
+res = na.omit(res)
+sigs = res[res$padj < 0.05,] ## only keeping padj < 0.05
+
+## adding symbols per ensembl gene id
+ensembl_id = rownames(sigs)
+ensembl_id = gsub("\\.\\d{1,}","", ensembl_id)
+sigs$symbol = mapIds(org.Hs.eg.db, 
+       keys = ensembl_id, 
+       keytype = "ENSEMBL", 
+       column =  "SYMBOL")
+
+sigs = na.omit(sigs)
+summary(sigs)
+
+```
+
+```{r}
+df.hm = sigs[(sigs$baseMean > 50) & (abs(sigs$log2FoldChange) > 2),] ## Further filtering noise out
+df.hm = df.hm[order(df.hm$log2FoldChange, decreasing = T),]
+df.hm = as.data.frame(df.hm)
+head(df.hm)
+```
+
+## Calculating z-score table for heatmap
+
+```{r}
+rlog_out = rlog(dds, blind=F) ## transform count into log2 scale
+mat = assay(rlog_out)[rownames(df.hm),] ## subsetting those which pass the filter from above
+base_mean = rowMeans(mat) 
+mat.scaled = t(apply(mat, 1, scale)) ## z-score
+colnames(mat.scaled) = colnames(mat)
+head(mat.scaled)
+```
+
+
+```{r}
+##keeping only a certain number of most significant rows
+keep = 25
+rows_keep = c(seq(1,keep), seq((nrow(mat.scaled)-keep), nrow(mat.scaled)))
+rows_keep
+```
+
+```{r include=FALSE}
+l2_val = as.matrix(df.hm[rows_keep,]$log2FoldChange)
+colnames(l2_val) = "logFC"
+
+mean_val = as.matrix(df.hm[rows_keep,]$baseMean)
+colnames(mean_val) = "AvgExpr"
+```
+
+
+```{r include=FALSE}
+col_logFC = colorRamp2(c(min(l2_val), 0, max(l2_val)), c("blue", "white", "red"))
+
+col_AvgExpr = colorRamp2(c(quantile(mean_val)[1], quantile(mean_val)[4]), c("white", "red"))
+```
+
+```{r message=FALSE, warning=FALSE}
+h= Heatmap(mat.scaled[rows_keep,], 
+              cluster_rows = T, 
+             cluster_columns = T,
+             column_labels = colnames(mat.scaled),
+             row_labels = df.hm[rows_keep,]$symbol,
+             row_names_gp = gpar(fontsize = 8),
+             name = "Z-score",
+             height = unit(12,"cm"),
+             width = unit(5, "cm")) 
+
+png("heatmap.png", res = 200, width = 800, height = 1500)
+print(h)
+dev.off()
+```
+
+![heatmap](heatmap.png)
+As shown in the heatmap, the differential gene expression is easily seen between the two groups. SRR7777133 is the Control, while the rest of the samples are WAGR mutants.
+
+## Functional analysis
+To understand what the possible functions of these genes are, we can look at gene ontology. 
+
+```{r}
+## getting Ensembl IDs
+GO_ensembl_id = rownames(df.hm[rows_keep,])
+GO_ensembl_id = gsub("\\.\\d{1,}", "", GO_ensembl_id)
+
+ego = enrichGO(gene = GO_ensembl_id, 
+         OrgDb = "org.Hs.eg.db",
+         keyType = "ENSEMBL", 
+         ont = "BP",
+         readable = T)
+
+dotplot(ego, 
+        showCategory = 20, 
+        x = "count",
+        font.size = 10,
+        title = "GO terms")
+
+barplot(ego)
+```
+
+```{r}
+## Add similarity matrix to the termsim slot of enrichment result
+ego <- enrichplot::pairwise_termsim(ego)
+
+emapplot(ego, showCategory = 20, 
+         cex_label_category = 0.5,
+         cex_category = 0.8)
+```
+
+
+
+
+
+System info for replicability.
+```{r}
+sessionInfo()
+```
+
