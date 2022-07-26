@@ -1,8 +1,13 @@
 Bulk RNA analysis pipeline
 ================
 
-This is a demonstration of a simple RNA-seq analysis pipeline. The raw
-data is retrieved from GEO of NCBI. The accession number is *GSE119360*.
+## Introduction
+
+This is a demonstration of a simple RNA-seq analysis pipeline. The
+objective is ***NOT*** to find significant results.
+
+The raw data is retrieved from GEO of NCBI. The accession number is
+*GSE119360*.
 
 In brief, SRA data was retrieved using `prefetch`.
 
@@ -19,21 +24,76 @@ first building an index with the desired reference and then mapping to
 such index.
 
 Mapped fragments are counted using `featureCounts` from `subread`
-toolkit.
+toolkit. Counts are stored in *counts_extracted.out*.
 
 The results are then imported to `R` and analyzed using `DESeq2`.
 
-The code of the first portion of data processing is not shown in this
-document.
+The code of the first portion of data processing is shown below.
+
+``` bash
+cat RNA-seq_preproc.sh
+```
+
+    ## #!bin/bash
+    ## 
+    ## conda activate rna-seq
+    ## 
+    ## ##get data from SRA
+    ## 
+    ## echo "Starting prefetch"
+    ## seq -f %1.0f 3371765  3371768 | while read x; do echo GSM${x} ;done |  parallel -j0 --bar 'prefetch  {.}'
+    ## echo "DONE prefetch"
+    ## 
+    ## mkdir -p raw_data
+    ## echo "fastq-dump for paired-reads"
+    ## find . | grep [0-9].sra | while read x; do a=$(basename $x); sub=${a%%.*} ; echo fastq-dump  --defline-qual "+" -v --split-files  -O raw_data/ --gzip ${sub}  ;done
+    ## echo "DONE fastq-dump"
+    ## 
+    ## 
+    ## mkdir -p QC
+    ## echo "fastqc and multiqc"
+    ## ls *fastq.gz | while read x; do fastqc -t 6 -o QC/ ${x} ;done
+    ## cd QC
+    ## multiqc .
+    ## cd ..
+    ## echo "DONE QC"
+    ## 
+    ## echo "building STAR index"
+    ## STAR --runThreadN 48 --runMode genomeGenerate --genomeDir GRCh38.primary_assembly.index --genomeFastaFiles GRCh38.primary_assembly.genome.fa --sjdbGTFfile gencode.v26.primary_assembly.annotation.gtf --sjdbOverhang 99
+    ## echo "Done building STAR index"
+    ## 
+    ## mkdir -p results
+    ## echo "STAR mapping"
+    ## cd .. raw_data/
+    ## ls *fastq.gz | while read x; do gunzip ${x} & done
+    ## cd ..
+    ## ## setting higher limit of parallel processes
+    ## ulimit -n 10000
+    ## find . | grep 1.fastq$ | while read x; do a=$(basename ${x}) ; sub=${a%%_*} ; STAR --genomeDir GRCh38.primary_assembly.index/ --runThreadN 48 --readFilesIn raw_data/${sub}_1.fastq raw_data/${sub}_2.fastq --outSAMtype BAM SortedByCoordinate --outSAMunmapped Within --outSAMattributes Standard --outFileNamePrefix ${sub} ;done
+    ## ulimit -n 1024
+    ## echo "Done STAR mapping"
+    ## 
+    ## echo "featureCounts"
+    ## cd results/
+    ## featureCounts    -p --countReadPairs \
+    ##          -a ../gencode.v26.primary_assembly.annotation.gtf \
+    ##          -T 48 \
+    ##      -t exon \
+    ##      -g gene_id \
+    ##      -o counts.out  \
+    ##      *bam
+    ## 
+    ## cat counts.out | cut -f 1,7- > counts_extracted.out
+    ## echo "Done featureCounts"
+    ## 
+    ## cd ..
 
 The second portion of data analysis starts with importing data from
-featureCounts, as shown below.
+*featureCounts*, as shown below.
 
 Please refer to the [GEO
 website](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE119360)
 for more sample preparation details.
-
-Please refer to this bash script for the code of data preprocessing.
 
 ## Libraries
 
@@ -137,7 +197,7 @@ vst=varianceStabilizingTransformation(dds, blind = F)
 plotPCA(vst, intgroup = "group")
 ```
 
-![](WAGR_DESeq_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 Dispersion plot for QC. The red fitted line is decreasing as counts
 increases. This is what we want to see.
@@ -146,7 +206,7 @@ increases. This is what we want to see.
 plotDispEsts(dds)
 ```
 
-![](WAGR_DESeq_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 Extracting results and filtering out insignificant p-values.
 
@@ -255,9 +315,11 @@ dev.off()
     ## quartz_off_screen 
     ##                 2
 
-![heatmap](heatmap.png) As shown in the heatmap, the differential gene
-expression is easily seen between the two groups. SRR7777133 is the
-Control, while the rest of the samples are WAGR mutants.
+![heatmap](heatmap.png)
+
+As shown in the heatmap, the differential gene expression is easily seen
+between the two groups. SRR7777133 is the Control, while the rest of the
+samples are WAGR mutants.
 
 ## Functional analysis
 
@@ -282,13 +344,13 @@ dotplot(ego,
         title = "GO terms")
 ```
 
-![](WAGR_DESeq_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
 barplot(ego)
 ```
 
-![](WAGR_DESeq_files/figure-gfm/unnamed-chunk-15-2.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-16-2.png)<!-- -->
 
 ``` r
 ## Add similarity matrix to the termsim slot of enrichment result
@@ -299,7 +361,7 @@ emapplot(ego, showCategory = 20,
          cex_category = 0.8)
 ```
 
-![](WAGR_DESeq_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 System info for replicability.
 

@@ -1,0 +1,110 @@
+---
+title: "RNA-seq"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(dplyr)
+library(tidyverse)
+library(GEOquery)
+library(ggplot2)
+
+```
+
+## Import data
+
+```{r}
+data <- read.csv("./RNA-seq/GSE85897_counts_scaled_Deseq.csv")
+```
+
+
+## Getting metadata
+
+```{r}
+gse <- getGEO(GEO = "GSE85897", GSEMatrix = T)
+meta <- pData(phenoData(gse[[1]]))
+```
+
+```{r}
+meta.subset <- meta %>%
+  select(1,2) %>% 
+  mutate(sample = gsub(": .*","", title), group = gsub("T\\d*: \\w+ \\w+ ","", title)) %>% 
+  select(2:4)
+```
+
+
+
+```{r}
+data.long <- data %>%
+  select(-ID) %>% 
+  rename(gene=GeneSymbol) %>% 
+  pivot_longer(!gene, names_to = "sample", values_to = "reads")
+```
+
+```{r}
+data.long <- data.long %>% 
+  left_join(.,meta.subset, by = c("sample" = "sample")) %>% 
+  select(-geo_accession)
+```
+
+```{r}
+goi = c("MTOR")
+data.long %>% 
+  filter(gene %in% goi) 
+```
+## Visualization
+
+```{r}
+## barplot
+data.long %>% 
+  filter(gene == "MTOR") %>% 
+  ggplot(., aes(x = sample, y = reads, fill = group)) + 
+  geom_col()
+
+```
+
+```{r}
+## Density plot
+data.long %>% 
+  filter(gene == "MTOR") %>% 
+  ggplot(., aes(x = reads, fill = group)) +
+  geom_density(alpha = 0.5)
+
+```
+
+```{r}
+##boxplot
+
+data.long %>% 
+  filter(gene == "MTOR") %>% 
+  ggplot(., aes(x = group, y = reads)) +
+  geom_boxplot()
+```
+
+```{r}
+## scatterplot
+
+data.long %>% 
+  filter(gene == "MTOR" | gene == "NF2") %>% 
+  pivot_wider(names_from = gene, values_from = reads) %>% 
+  ggplot(., aes(x = MTOR, y = NF2, color = group)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = F)
+  
+```
+
+```{r}
+## heatmap
+
+goi <- c("BRCA1", "BRCA2", "TP53", "ALK", "MYCN")
+
+data.long %>% 
+  filter(gene %in% goi) %>% 
+  ggplot(., aes(x=samples, y = gene, fill = FPKM)) + 
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "red")
+```
+
