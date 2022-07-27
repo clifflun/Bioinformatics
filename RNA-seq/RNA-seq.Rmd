@@ -5,7 +5,7 @@ output: github_document
 
 ## Introduction
 
-This is a demonstration of a simple RNA-seq analysis pipeline. The objective is ***NOT*** to find significant results.
+This is a demonstration of a simple RNA-seq analysis pipeline.
 
 The raw data is retrieved from GEO of NCBI. The accession number is *GSE119360*. 
 
@@ -44,6 +44,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
+library(EnhancedVolcano)
 library(clusterProfiler)
 library(enrichplot)
 library(DOSE)
@@ -114,11 +115,45 @@ plotDispEsts(dds)
 
 Extracting results and filtering out insignificant p-values.
 
-The summary table shows us how many genes are up or down regulated.
+Visualize results using volcano plot.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 res = results(dds, contrast = c("group", "WAGR", "Control"))
 res = na.omit(res)
+
+ensembl_id = rownames(res)
+ensembl_id = gsub("\\.\\d{1,}","", ensembl_id)
+res$symbol = mapIds(org.Hs.eg.db, 
+       keys = ensembl_id, 
+       keytype = "ENSEMBL", 
+       column =  "SYMBOL")
+res.df = as.data.frame(res)
+res.df = na.omit(res.df)
+EnhancedVolcano(res.df, 
+                x= "log2FoldChange", 
+                y = "padj", 
+                lab = res.df$symbol,
+                pCutoff = 0.05)
+```
+
+The IGKC gene is an outlier, removing outlier for better visualization.
+
+```{r}
+res.df = res.df %>% 
+  arrange(padj) %>% 
+  filter(symbol != "IGKC")
+
+EnhancedVolcano(res.df, 
+                x= "log2FoldChange", 
+                y = "padj", 
+                lab = res.df$symbol,
+                labSize = 4,
+                pCutoff = 0.05)
+```
+
+
+The summary table shows us how many genes are up or down regulated.
+```{r}
 sigs = res[res$padj < 0.05,] ## only keeping padj < 0.05
 
 ## adding symbols per ensembl gene id
@@ -191,7 +226,7 @@ print(h)
 dev.off()
 ```
 
-![heatmap](heatmap.png)
+![heatmap](heatmap.png){width = 50%, height = 50%}
 
 As shown in the heatmap, the differential gene expression is easily seen between the two groups. SRR7777133 is the Control, while the rest of the samples are WAGR mutants.
 

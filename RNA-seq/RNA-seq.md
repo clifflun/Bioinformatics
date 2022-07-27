@@ -3,8 +3,7 @@ Bulk RNA analysis pipeline
 
 ## Introduction
 
-This is a demonstration of a simple RNA-seq analysis pipeline. The
-objective is ***NOT*** to find significant results.
+This is a demonstration of a simple RNA-seq analysis pipeline.
 
 The raw data is retrieved from GEO of NCBI. The accession number is
 *GSE119360*.
@@ -99,6 +98,7 @@ for more sample preparation details.
 
 ``` r
 library(tidyverse)
+library(EnhancedVolcano)
 library(clusterProfiler)
 library(enrichplot)
 library(DOSE)
@@ -210,11 +210,49 @@ plotDispEsts(dds)
 
 Extracting results and filtering out insignificant p-values.
 
-The summary table shows us how many genes are up or down regulated.
+Visualize results using volcano plot.
 
 ``` r
 res = results(dds, contrast = c("group", "WAGR", "Control"))
 res = na.omit(res)
+
+ensembl_id = rownames(res)
+ensembl_id = gsub("\\.\\d{1,}","", ensembl_id)
+res$symbol = mapIds(org.Hs.eg.db, 
+       keys = ensembl_id, 
+       keytype = "ENSEMBL", 
+       column =  "SYMBOL")
+res.df = as.data.frame(res)
+res.df = na.omit(res.df)
+EnhancedVolcano(res.df, 
+                x= "log2FoldChange", 
+                y = "padj", 
+                lab = res.df$symbol,
+                pCutoff = 0.05)
+```
+
+![](RNA-seq_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+The IGKC gene is an outlier, removing outlier for better visualization.
+
+``` r
+res.df = res.df %>% 
+  arrange(padj) %>% 
+  filter(symbol != "IGKC")
+
+EnhancedVolcano(res.df, 
+                x= "log2FoldChange", 
+                y = "padj", 
+                lab = res.df$symbol,
+                labSize = 4,
+                pCutoff = 0.05)
+```
+
+![](RNA-seq_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+The summary table shows us how many genes are up or down regulated.
+
+``` r
 sigs = res[res$padj < 0.05,] ## only keeping padj < 0.05
 
 ## adding symbols per ensembl gene id
@@ -315,7 +353,7 @@ dev.off()
     ## quartz_off_screen 
     ##                 2
 
-![heatmap](heatmap.png)
+![heatmap](heatmap.png){width = 50%, height = 50%}
 
 As shown in the heatmap, the differential gene expression is easily seen
 between the two groups. SRR7777133 is the Control, while the rest of the
@@ -344,13 +382,13 @@ dotplot(ego,
         title = "GO terms")
 ```
 
-![](RNA-seq_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ``` r
 barplot(ego)
 ```
 
-![](RNA-seq_files/figure-gfm/unnamed-chunk-16-2.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-18-2.png)<!-- -->
 
 ``` r
 ## Add similarity matrix to the termsim slot of enrichment result
@@ -361,7 +399,7 @@ emapplot(ego, showCategory = 20,
          cex_category = 0.8)
 ```
 
-![](RNA-seq_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](RNA-seq_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
 System info for replicability.
 
@@ -396,11 +434,12 @@ sessionInfo()
     ## [17] BiocGenerics_0.42.0         pathview_1.36.0            
     ## [19] ggnewscale_0.4.7            DOSE_3.22.0                
     ## [21] enrichplot_1.16.1           clusterProfiler_4.4.4      
-    ## [23] forcats_0.5.1               stringr_1.4.0              
-    ## [25] dplyr_1.0.9                 purrr_0.3.4                
-    ## [27] readr_2.1.2                 tidyr_1.2.0                
-    ## [29] tibble_3.1.8                ggplot2_3.3.6              
-    ## [31] tidyverse_1.3.2            
+    ## [23] EnhancedVolcano_1.14.0      ggrepel_0.9.1              
+    ## [25] forcats_0.5.1               stringr_1.4.0              
+    ## [27] dplyr_1.0.9                 purrr_0.3.4                
+    ## [29] readr_2.1.2                 tidyr_1.2.0                
+    ## [31] tibble_3.1.8                ggplot2_3.3.6              
+    ## [33] tidyverse_1.3.2            
     ## 
     ## loaded via a namespace (and not attached):
     ##   [1] utf8_1.2.2             R.utils_2.12.0         tidyselect_1.1.2      
@@ -424,29 +463,28 @@ sessionInfo()
     ##  [55] ggplotify_0.1.0        ellipsis_0.3.2         Rcpp_1.0.9            
     ##  [58] plyr_1.8.7             zlibbioc_1.42.0        RCurl_1.98-1.7        
     ##  [61] GetoptLong_1.0.5       viridis_0.6.2          haven_2.5.0           
-    ##  [64] ggrepel_0.9.1          cluster_2.1.3          fs_1.5.2              
-    ##  [67] magrittr_2.0.3         magick_2.7.3           data.table_1.14.2     
-    ##  [70] DO.db_2.9              reprex_2.0.1           googledrive_2.0.0     
-    ##  [73] hms_1.1.1              patchwork_1.1.1        evaluate_0.15         
-    ##  [76] xtable_1.8-4           XML_3.99-0.10          readxl_1.4.0          
-    ##  [79] gridExtra_2.3          shape_1.4.6            compiler_4.2.1        
-    ##  [82] crayon_1.5.1           shadowtext_0.1.2       R.oo_1.25.0           
-    ##  [85] htmltools_0.5.3        ggfun_0.0.6            tzdb_0.3.0            
-    ##  [88] geneplotter_1.74.0     aplot_0.1.6            lubridate_1.8.0       
-    ##  [91] DBI_1.1.3              tweenr_1.0.2           dbplyr_2.2.1          
-    ##  [94] MASS_7.3-58            Matrix_1.4-1           cli_3.3.0             
-    ##  [97] R.methodsS3_1.8.2      parallel_4.2.1         igraph_1.3.4          
-    ## [100] pkgconfig_2.0.3        xml2_1.3.3             foreach_1.5.2         
-    ## [103] ggtree_3.4.1           annotate_1.74.0        XVector_0.36.0        
-    ## [106] rvest_1.0.2            yulab.utils_0.0.5      digest_0.6.29         
-    ## [109] graph_1.74.0           Biostrings_2.64.0      rmarkdown_2.14        
-    ## [112] cellranger_1.1.0       fastmatch_1.1-3        tidytree_0.3.9        
-    ## [115] curl_4.3.2             rjson_0.2.21           lifecycle_1.0.1       
-    ## [118] nlme_3.1-158           jsonlite_1.8.0         viridisLite_0.4.0     
-    ## [121] limma_3.52.2           fansi_1.0.3            pillar_1.8.0          
-    ## [124] lattice_0.20-45        KEGGREST_1.36.3        fastmap_1.1.0         
-    ## [127] httr_1.4.3             survival_3.3-1         GO.db_3.15.0          
-    ## [130] glue_1.6.2             png_0.1-7              iterators_1.0.14      
-    ## [133] bit_4.0.4              Rgraphviz_2.40.0       ggforce_0.3.3         
-    ## [136] stringi_1.7.8          blob_1.2.3             memoise_2.0.1         
-    ## [139] ape_5.6-2
+    ##  [64] cluster_2.1.3          fs_1.5.2               magrittr_2.0.3        
+    ##  [67] magick_2.7.3           data.table_1.14.2      DO.db_2.9             
+    ##  [70] reprex_2.0.1           googledrive_2.0.0      hms_1.1.1             
+    ##  [73] patchwork_1.1.1        evaluate_0.15          xtable_1.8-4          
+    ##  [76] XML_3.99-0.10          readxl_1.4.0           gridExtra_2.3         
+    ##  [79] shape_1.4.6            compiler_4.2.1         crayon_1.5.1          
+    ##  [82] shadowtext_0.1.2       R.oo_1.25.0            htmltools_0.5.3       
+    ##  [85] ggfun_0.0.6            tzdb_0.3.0             geneplotter_1.74.0    
+    ##  [88] aplot_0.1.6            lubridate_1.8.0        DBI_1.1.3             
+    ##  [91] tweenr_1.0.2           dbplyr_2.2.1           MASS_7.3-58           
+    ##  [94] Matrix_1.4-1           cli_3.3.0              R.methodsS3_1.8.2     
+    ##  [97] parallel_4.2.1         igraph_1.3.4           pkgconfig_2.0.3       
+    ## [100] xml2_1.3.3             foreach_1.5.2          ggtree_3.4.1          
+    ## [103] annotate_1.74.0        XVector_0.36.0         rvest_1.0.2           
+    ## [106] yulab.utils_0.0.5      digest_0.6.29          graph_1.74.0          
+    ## [109] Biostrings_2.64.0      rmarkdown_2.14         cellranger_1.1.0      
+    ## [112] fastmatch_1.1-3        tidytree_0.3.9         curl_4.3.2            
+    ## [115] rjson_0.2.21           lifecycle_1.0.1        nlme_3.1-158          
+    ## [118] jsonlite_1.8.0         viridisLite_0.4.0      limma_3.52.2          
+    ## [121] fansi_1.0.3            pillar_1.8.0           lattice_0.20-45       
+    ## [124] KEGGREST_1.36.3        fastmap_1.1.0          httr_1.4.3            
+    ## [127] survival_3.3-1         GO.db_3.15.0           glue_1.6.2            
+    ## [130] png_0.1-7              iterators_1.0.14       bit_4.0.4             
+    ## [133] Rgraphviz_2.40.0       ggforce_0.3.3          stringi_1.7.8         
+    ## [136] blob_1.2.3             memoise_2.0.1          ape_5.6-2
