@@ -1,0 +1,14 @@
+Module	Section	Sample Name	Source
+FastQC	all_sections	SRR6939910	/home/wonge05/bfx/ChIP-seq/QC/SRR6939910_fastqc.zip
+FastQC	all_sections	SRR6939911	/home/wonge05/bfx/ChIP-seq/QC/SRR6939911_fastqc.zip
+FastQC	all_sections	SRR6939912	/home/wonge05/bfx/ChIP-seq/QC/SRR6939912_fastqc.zip
+FastQC	all_sections	SRR6939913	/home/wonge05/bfx/ChIP-seq/QC/SRR6939913_fastqc.zip
+FastQC	all_sections	SRR6939914	/home/wonge05/bfx/ChIP-seq/QC/SRR6939914_fastqc.zip
+FastQC	all_sections	SRR6939915	/home/wonge05/bfx/ChIP-seq/QC/SRR6939915_fastqc.zip
+FastQC	all_sections	SRR6939916	/home/wonge05/bfx/ChIP-seq/QC/SRR6939916_fastqc.zip
+FastQC	all_sections	SRR6939917	/home/wonge05/bfx/ChIP-seq/QC/SRR6939917_fastqc.zip
+FastQC	all_sections	SRR6939918	/home/wonge05/bfx/ChIP-seq/QC/SRR6939918_fastqc.zip
+FastQC	all_sections	SRR6939919	/home/wonge05/bfx/ChIP-seq/QC/SRR6939919_fastqc.zip
+FastQC	all_sections	SRR6939921	/home/wonge05/bfx/ChIP-seq/QC/SRR6939921_fastqc.zip
+FastQC	all_sections	SRR6939920	/home/wonge05/bfx/ChIP-seq/QC/SRR6939920_fastqc.zip
+FastQC	all_sections	SRR6939922	/home/wonge05/bfx/ChIP-seq/QC/SRR6939922_fastqc.zip
