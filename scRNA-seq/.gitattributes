@@ -1,1 +1,2 @@
-*.txt filter=lfs diff=lfs merge=lfs -text
+*.mtx filter=lfs diff=lfs merge=lfs -text
+/Volumes/MyBook_3/git/bioinformatics/scRNA-seq/data/filtered_gene_bc_matrices_8kpbmc/GRCh38/matrix.mtx filter=lfs diff=lfs merge=lfs -text
