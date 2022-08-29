@@ -1,31 +1,322 @@
 ---
-title: "scrna"
+title: "scRNA-seq analysis pipeline"
 output: github_document
 ---
 
+This is a demonstration of scRNA-seq analysis using Seurat on R. scanpy can be used for python users.
+
+This dataset is downloaded from [10X Genomics](https://www.10xgenomics.com/resources/datasets).
+
+The processing steps of raw reads to counts can be done online/running CellRanger Tool on HPC clusters. 
 
 
-## TEsting 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Libraries
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(Seurat)
 ```
 
-## R Markdown
+# Load data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+pbmc_data = Read10X("../data/filtered_gene_bc_matrices_8kpbmc/GRCh38/")
 ```
 
-## Including Plots
+# Seurat object
 
-You can also embed plots, for example:
+```{r message=FALSE, warning=FALSE}
+seurat = CreateSeuratObject(count = pbmc_data, 
+                            min.cell = 3, 
+                            project = "PBMC")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# QA and filtering
+
+```{r}
+seurat[["percent.mito"]] = PercentageFeatureSet(seurat, pattern = "^MT-") ##calculating mito percentage
+```
+
+Lets make violin plots to see if the dataset is of high quality.
+
+```{r}
+VlnPlot(seurat, 
+        features = c("nFeature_RNA", "nCount_RNA", "percent.mito"), 
+        pt.size = .2, 
+        ncol = 3)
+```
+
+As shown above, the number of RNA features and RNA count is really high, which is ideal. The percentage of mitochondrial RNA is also really low (~5%), meaning the dataset is fairly "clean". (Not many cells bursted)
+
+It is hard to see with all these dots in the way. Let's make a histogram to inspect percent.mito to find a cutoff.
+```{r}
+hist(seurat$percent.mito, breaks = 50)
+```
+
+Just to see the relation between percent.mito and nFeature_RNA. 
+
+```{r}
+qplot(x=nFeature_RNA, y=percent.mito, data = seurat@meta.data)
+```
+
+This is an arbitray threshold, but I am choosing 7.5% as a cutoff here. (dump anything > 7.5% mito)
+
+## Subsetting
+
+Keeping cells with more than 200 RNAs ***AND*** less than 7.5% mito RNA.
+```{r}
+seurat = subset(seurat, 
+                subset = percent.mito < 7.5 &
+                nFeature_RNA > 200)
+```
+
+## Normalization (Library-size scaling)
+
+```{r}
+seurat = NormalizeData(seurat)
+```
+
+# Dimensionality Reduction
+
+```{r}
+seurat = FindVariableFeatures(seurat, 
+                              selection.method = "vst",
+                              nfeatures = 2000)
+```
+
+Looking at top 20 variable genes.
+
+```{r}
+head(VariableFeatures(seurat), n = 20)
+```
+
+## PCA: linear DR
+
+```{r}
+seurat = ScaleData(seurat)
+```
+
+```{r}
+seurat = RunPCA(seurat)
+```
+
+```{r}
+DimPlot(seurat)
+```
+
+Just randomly picking 4 genes from PC_1 to show heterogeneity. 
+
+```{r}
+FeaturePlot(seurat, features = c("CD3D", "CST3", "TRAC", "CD68"), cols = c("lightgrey","red"))
+```
+
+To see how many PCs are capturing the difference (probably 25? 30?)
+```{r}
+ElbowPlot(seurat, ndims = 50)
+```
+
+## UMAP: non-linear DR
+
+Not using t-SNE because it is basically inferior.
+
+[UMAP displays global structures while t-SNE does not.](https://blog.bioturing.com/2022/01/14/umap-vs-t-sne-single-cell-rna-seq-data-visualization/#:~:text=t%2DSNE%20and%20UMAP%20have,UMAP%20compresses%20that%20graph.)
+
+
+```{r}
+seurat = RunUMAP(seurat, dims = 1:30)
+
+```
+
+```{r}
+DimPlot(seurat)
+```
+
+```{r}
+FeaturePlot(seurat, features = c("CD3D", "CST3", "TRAC", "CD68"), cols = c("lightgrey","red"))
+```
+
+```{r eval=FALSE, include=FALSE}
+saveRDS(seurat, file="../output/pbmc_seurat_filtered.rds")
+```
+
+# Clustering
+
+```{r}
+seurat = FindNeighbors(seurat, dims = 1:30)
+```
+```{r}
+seurat = FindClusters(seurat, resolution = 0.2)
+```
+
+```{r}
+DimPlot(seurat, label = T)
+```
+
+```{r}
+cluster_markers = FindAllMarkers(seurat, 
+                                 logfc.threshold = 0.5, 
+                                 only.pos = T)
+```
+
+```{r}
+top_genes = cluster_markers %>% 
+  group_by(cluster) %>% 
+  top_n(1, avg_log2FC) %>% 
+  pull(gene)
+```
+
+```{r}
+FeaturePlot(seurat, features = top_genes[1:9], 
+            cols = c('lightgrey', 'red'), 
+            pt.size = 0.1)
+```
+
+# Other visualization tools
+
+```{r}
+VlnPlot(seurat, features = "CCL5", pt.size = 0.3)
+```
+
+```{r}
+RidgePlot(seurat, features =  "CCL5")
+```
+
+# Differential Expression
+
+```{r}
+FeaturePlot(seurat, features = "CD4")
+```
+
+From this, just pretend:
+
+Cluster 0 = Memory CD4 T cells
+
+Cluster 3 = Naive CD4 cells
+```{r}
+dge_tcells = FindMarkers(seurat, 
+                         ident.1 = 0, 
+                         ident.2 = 3, 
+                         only.pos = F, 
+                         logfc.threshold = 0)
+```
+
+## GSEA
+
+```{r}
+library(fgsea)
+```
+
+### Loading gmt data
+
+These data can be found [here](http://www.gsea-msigdb.org/gsea/msigdb/collections.jsp)
+
+```{r}
+hallmarks = gmtPathways("../data/hallmark.genesets.v6.1.symbols.gmt")
+kegg = gmtPathways("../data/kegg.genesets.v6.1.symbols.gmt")
+reactome = gmtPathways("../data/reactome.genesets.v6.1.symbols.gmt")
+go = gmtPathways("../data/GOTerms.BP.v6.1.symbols.gmt")
+
+gene_sets = c(hallmarks, kegg, reactome, go)
+```
+
+
+Pairing gene names with fold change.
+```{r}
+dge_tcells$gene = rownames(dge_tcells)
+dge_tcells = dge_tcells %>% 
+  arrange(desc(avg_log2FC))
+fold_changes = dge_tcells$avg_log2FC
+names(fold_changes) = dge_tcells$gene
+```
+
+```{r}
+gsea_tcell = fgsea(pathways = gene_sets, 
+                   stats = fold_changes, 
+                   minSize = 5, 
+                   maxSize = 5000, 
+                   nproc = 2)
+```
+
+```{r}
+gsea_sig = filter(gsea_tcell, padj <= 0.05) %>% 
+  arrange(NES)
+```
+
+### Gene Set Scoring
+
+Seurat has a function to score each cell for a set of pre-defined genes.
+
+```{r}
+head(gsea_sig)
+```
+
+Using "REACTOME_3_UTR_MEDIATED_TRANSLATIONAL_REGULATION"
+
+```{r}
+seurat = AddModuleScore(seurat, 
+                        features = gene_sets["REACTOME_3_UTR_MEDIATED_TRANSLATIONAL_REGULATION"], 
+                        name = "REACTOME_3_UTR_MEDIATED_TRANSLATIONAL_REGULATION")
+```
+
+```{r}
+FeaturePlot(seurat, 
+            features = 'REACTOME_3_UTR_MEDIATED_TRANSLATIONAL_REGULATION1', 
+            cols = c('lightgrey', 'red'), 
+            order = T)
+```
+
+Cannot really see the difference, perhaps quantitative plots will show the difference better.
+
+```{r}
+VlnPlot(seurat, 
+        features = 'REACTOME_3_UTR_MEDIATED_TRANSLATIONAL_REGULATION1',
+        pt.size = 0.1)
+```
+
+
+Just to visualize between clusters 0 and 3.
+```{r}
+VlnPlot(seurat, 
+        features = 'REACTOME_3_UTR_MEDIATED_TRANSLATIONAL_REGULATION1',
+        pt.size = 0.1,
+        idents = c(0,3))
+```
+
+## Generic pathway activity
+
+```{r}
+library(progeny)
+library(dorothea)
+```
+
+PROGENy is resource that leverages a large compendium of publicly available signaling perturbation experiments to yield a common core of pathway responsive genes for human and mouse. These, coupled with any statistical method, can be used to infer pathway activities from bulk or single-cell transcriptomics.
+
+
+```{r}
+exp_mat <- as.matrix(seurat[["RNA"]]@data)
+pathways <- progeny(exp_mat, 
+                    scale=T,
+                    organism="Human")
+head(pathways)
+```
+
+
+We can add all of this data into our metadata
+```{r}
+seurat@meta.data <- cbind(seurat@meta.data, pathways)
+```
+
+And visualize activities. I'll just get a list of the different pathways from the column names of that "pathways" variable
+
+```{r}
+RidgePlot(seurat, features = colnames(pathways), ncol = 4)
+```
+
+
+
+```{r}
+sessionInfo()
+```
+
+
