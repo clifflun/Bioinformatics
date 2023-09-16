@@ -1,1 +1,6 @@
-test
+The Human Phenotype Ontology (HPO) is a standardized vocabulary of phenotypic abnormalities encountered in human disease, which enables computational inference and sophisticated algorithms that support combined genomic and phenotypic analyses. The HPO has broad clinical, translational, and research applications, including genomic interpretation for diagnostics, gene-disease discovery, mechanism discovery, and cohort analytics, and is widely used for capturing human disease phenotypes for computational analysis to support differential diagnostics. 
+
+There are a few libraries that store HPO information online, OBO Foundry being the most popular one. It is a group that maintains a suite of interoperable reference ontologies in the biomedical domain, with over a hundred ontologies currently following these principles. For human disease purposes, we are going to use HPO. 
+
+Each subject can contain more than one HPO term. HPO similarity scores can be calculated using R packages ontologySimilarity, ontologyIndex, and ontologyPlot. A similarity matrix, hence a distance matrix can be generated and visualized using a heatmap. HPO term frequency and distribution can provide valuable information regarding the genotype-phenotype relationship.
+
